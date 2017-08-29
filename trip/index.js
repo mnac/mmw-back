@@ -94,6 +94,8 @@ function getTimeLineTrips(exclusiveStartKey, currentUserId, result) {
               console.log("user");
               console.log(user);
               return Promise.resolve();
+            }).catch(function(userError){
+              console.log(userError);
             }));
           promises.push(stage.getTripStages(item.id, null).promise()
             .then(function(stages){
