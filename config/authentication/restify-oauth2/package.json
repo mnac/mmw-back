@@ -1,0 +1,81 @@
+{
+  "_from": "restify-oauth2",
+  "_id": "restify-oauth2@4.0.4",
+  "_inBundle": false,
+  "_integrity": "sha1-6+b4U6q9WrUBqLJXiWdIFG6v3V0=",
+  "_location": "/restify-oauth2",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "tag",
+    "registry": true,
+    "raw": "restify-oauth2",
+    "name": "restify-oauth2",
+    "escapedName": "restify-oauth2",
+    "rawSpec": "",
+    "saveSpec": null,
+    "fetchSpec": "latest"
+  },
+  "_requiredBy": [
+    "#USER",
+    "/"
+  ],
+  "_resolved": "https://registry.npmjs.org/restify-oauth2/-/restify-oauth2-4.0.4.tgz",
+  "_shasum": "ebe6f853aabd5ab501a8b257896748146eafdd5d",
+  "_spec": "restify-oauth2",
+  "_where": "/Users/Mathias/perso/dev-perso/mmw",
+  "author": {
+    "name": "Domenic Denicola",
+    "email": "domenic@domenicdenicola.com",
+    "url": "http://domenic.me/"
+  },
+  "bugs": {
+    "url": "http://github.com/domenic/restify-oauth2/issues"
+  },
+  "bundleDependencies": false,
+  "dependencies": {
+    "underscore": "1.x"
+  },
+  "deprecated": false,
+  "description": "A simple OAuth 2 endpoint for Restify",
+  "devDependencies": {
+    "api-easy": "^0.4.0",
+    "chai": "^3.2.0",
+    "coffee-script": "^1.9.3",
+    "jshint": "^2.8.0",
+    "mocha": "^2.2.5",
+    "restify": "^4.0",
+    "sinon": "^1.16.1",
+    "sinon-chai": "^2.8.0",
+    "vows": "^0.8.1"
+  },
+  "homepage": "https://github.com/domenic/restify-oauth2#readme",
+  "keywords": [
+    "restify",
+    "oauth",
+    "oauth2",
+    "rest",
+    "authorization",
+    "authentication",
+    "api"
+  ],
+  "license": "WTFPL",
+  "main": "lib/index.js",
+  "name": "restify-oauth2",
+  "peerDependencies": {
+    "restify": "4.x"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/domenic/restify-oauth2.git"
+  },
+  "scripts": {
+    "lint": "jshint lib && jshint examples",
+    "test": "npm run test-ropc-unit && npm run test-cc-unit && npm run test-ropc-integration && npm run test-cc-integration && npm run test-cc-with-scopes-integration",
+    "test-cc-integration": "vows test/cc-integration.coffee --spec",
+    "test-cc-unit": "mocha test/cc-unit.coffee --reporter spec --compilers coffee:coffee-script/register",
+    "test-cc-with-scopes-integration": "vows test/cc-with-scopes-integration.coffee --spec",
+    "test-ropc-integration": "vows test/ropc-integration.coffee --spec",
+    "test-ropc-unit": "mocha test/ropc-unit.coffee --reporter spec --compilers coffee:coffee-script/register"
+  },
+  "version": "4.0.4"
+}

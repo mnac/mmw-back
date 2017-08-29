@@ -1,0 +1,30 @@
+{
+  "name": "mmw",
+  "version": "0.0.1",
+  "description": "Make my way backend",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \\\"Error: no test specified\\\" && exit 1",
+    "start": "node index.js"
+  },
+  "author": "Mathias NACRY",
+  "license": "ISC",
+  "dependencies": {
+    "Q": "^1.0.0",
+    "aws-sdk": "^2.103.0",
+    "bcryptjs": "^1.0.2",
+    "firebase-admin": "^5.2.1",
+    "isemail": "^3.0.0",
+    "mysql": "^2.13.0",
+    "q": "^1.5.0",
+    "q-promise": "^1.0.0",
+    "react": "^15.6.1",
+    "redis": "^2.8.0",
+    "restify": "^5.0.1",
+    "underscore": "^1.8.3"
+  },
+  "devDependencies": {
+    "mocha": "^3.4.2",
+    "nodemon": "^1.11.0"
+  }
+}
