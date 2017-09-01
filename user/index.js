@@ -321,7 +321,9 @@ function init(server){
           console.log("sql: " + sql);
           db(sql, values, function(error, result){
             if (error) {
-              response.json(error);
+              console.log("registation failed");
+              console.log(error);
+              response.send(503, error);
               next();
             } else {
               console.log("User registered");

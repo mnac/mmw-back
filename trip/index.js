@@ -95,6 +95,7 @@ function getTimeLineTrips(exclusiveStartKey, currentUserId, result) {
               console.log(user);
               return Promise.resolve();
             }).catch(function(userError){
+              item.user = {};
               console.log(userError);
             }));
           promises.push(stage.getTripStages(item.id, null).promise()
@@ -256,7 +257,9 @@ function init(server){
         console.log(err);
         response.send(404);
       } else {
-        response.send(200, data);
+        let trips = {};
+        trips["trips"] = data;
+        response.send(200, trips);
       }
     });
   });
