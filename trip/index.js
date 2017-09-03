@@ -29,17 +29,58 @@ function getTripFollower(tripId, userId, exclusiveStartKey) {
   return dynamo.query(params);
 }
 
-function getTrip(uuid, result) {
+function getTrip(tripId, userId, result) {
   var params = {
     TableName: 'trip',
-    Key: {
-      "id": uuid
+    Limit: 1,
+    ScanIndexForward: false,
+    KeyConditionExpression: 'id = :x',
+    ExpressionAttributeValues: {
+      ':x': tripId
     }
   };
-  dynamo.get(params, result);
+
+  dynamo.query(params).promise()
+    .then(function(trip){
+      console.log("trip");
+      console.log(trip);
+      let tripStages = trip.Items[0];
+      return stage.getTripStages(tripStages.id, null).promise()
+        .then(function(stages){
+          tripStages.stages = stages.Items;
+          console.log("stages");
+          console.log(stages);
+          return Promise.resolve(tripStages);
+        });
+    })
+    .then(function(trip){
+      return getTripFollower(trip.id, userId, null).promise()
+        .then(function(follower) {
+          console.log("follower: ");
+          console.log(follower);
+          console.log("Following: ");
+          trip.isFollowing = follower !== null && follower.Items != null && follower.Items !== 'undefined' && follower.Items.length > 0;
+          console.log(trip.isFollowing);
+          return Promise.resolve(trip);
+        }).catch(function(err) {
+          console.log("Catch follower");
+          console.log(err);
+        })
+    })
+    .then((trip) => {
+      console.log("trip");
+      console.log(trip);
+      return result(null, trip);
+    }).catch(function(err) {
+      console.log("Final Catch");
+      console.log(err);
+      result(err);
+    });
 }
 
 function getUserTrips(userId, exclusiveStartKey, result) {
+  console.log("userId");
+  console.log(userId);
   var params = {
     TableName: 'trip',
     Limit: 50,
@@ -58,7 +99,65 @@ function getUserTrips(userId, exclusiveStartKey, result) {
          console.log(exclusiveStartKey);
          params["ExclusiveStartKey"] = exclusiveStartKey;
   }
-  dynamo.query(params, result);
+
+  dynamo.query(params).promise()
+    .then(function(tripData){
+      console.log("tripData: ");
+      console.log(tripData.Items);
+      let promises = [];
+      for (let item of tripData.Items){
+        (function(item){
+          console.log("trip item");
+          console.log(item);
+          promises.push(stage.getTripStages(item.id, null).promise()
+            .then(function(stages){
+              item.stages = stages.Items;
+              console.log("stages");
+              console.log(stages);
+              return Promise.resolve();
+            }));
+          promises.push(getTripFollower(item.id, userId, null).promise()
+            .then(function(follower) {
+              console.log("follower: ");
+              console.log(follower);
+              console.log("Following: ");
+              item.isFollowing = follower !== null && follower.Items != null && follower.Items !== 'undefined' && follower.Items.length > 0;
+              console.log(item.isFollowing);
+            }).catch(function(err) {
+              console.log("Catch follower");
+              console.log(err);
+            }));
+        })(item);
+      }
+      return Promise.all(promises).then(() => {
+        return Promise.resolve(tripData.Items);
+      });
+    }).then(function(tripData) {
+      var profile = {};
+      profile.trips = tripData;
+
+      console.log("Items: ");
+      console.log(tripData);
+      return User.findUserById(userId)
+        .then(function(user){
+          profile.user = user;
+          console.log("user");
+          console.log(user);
+          return Promise.resolve(profile);
+        }).catch(function(userError){
+          profile.user = {};
+          console.log(userError);
+          return Promise.resolve(profile);
+        });
+    }).then((userProfile) => {
+      console.log("userProfile");
+      console.log(userProfile);
+      return result(null, userProfile);
+    }).catch(function(err) {
+      console.log("Final Catch");
+      console.log(err);
+      result(err);
+    });
 }
 
 function getTimeLineTrips(exclusiveStartKey, currentUserId, result) {
@@ -100,14 +199,14 @@ function getTimeLineTrips(exclusiveStartKey, currentUserId, result) {
             }));
           promises.push(stage.getTripStages(item.id, null).promise()
             .then(function(stages){
-              item.stages = stages;
+              item.stages = stages.Items;
               console.log("stages");
               console.log(stages);
               return Promise.resolve();
             }));
           promises.push(getTripFollower(item.id, currentUserId, null).promise()
             .then(function(follower) {
-              item.isFollowing = follower !== null && follower.Item != null && follower.Items !== 'undefined' && follower.Items.length > 0;
+              item.isFollowing = follower !== null && follower.Items != null && follower.Items !== 'undefined' && follower.Items.length > 0;
               console.log("Following: ");
               console.log(item.isFollowing);
             }));
@@ -145,18 +244,18 @@ function saveTripFollower(tripId, followerId, result){
   var params = {
     TableName: 'trip-follower',
     Item: {
-      "tripId": userId,
+      "tripId": tripId,
       "followerId": followerId
     }
   };
   dynamo.put(params, result);
 }
 
-function removeTripFollower(userId, followerId, result){
+function removeTripFollower(tripId, followerId, result){
   var params = {
     TableName: 'trip-follower',
     Key: {
-      "tripId": userId,
+      "tripId": tripId,
       "followerId": followerId
     }
   };
@@ -227,12 +326,20 @@ function init(server){
 
   server.get("/trip/:uuid", function(request, response, next){
     if (!request.clientId) return response.sendUnauthenticated();
-    getTrip(request.params.uuid, function(err, data) {
+
+    let userId = request.header("userId", "");
+    if (typeof userId === 'undefined' || userId == null || !userId.trim()) {
+      response.send(422, `userId is not associated`);
+      next();
+      return;
+    }
+
+    getTrip(request.params.uuid, userId, function(err, data) {
       if (err) {
         console.log(err);
         response.send(404);
       } else {
-        response.send(200, data.Item);
+        response.send(200, data);
       }
     });
   });
@@ -264,6 +371,36 @@ function init(server){
     });
   });
 
+  server.get("/profile", function(request, response, next){
+    if (!request.clientId) return response.sendUnauthenticated();
+
+    let lastEvaluatedKey = {};
+    lastEvaluatedKey["id"] = request.params.id;
+    lastEvaluatedKey["userId"] = request.params.userId;
+    lastEvaluatedKey["creationDate"] = request.params.creationDate;
+
+    let userId = request.header("userId", "");
+    if (typeof userId === 'undefined' || userId == null || !userId.trim()) {
+      response.send(422, `userId is not associated`);
+      next();
+      return;
+    }
+
+    getUserTrips(userId, lastEvaluatedKey, function(err, data) {
+      console.log("data: " + data);
+      if (err) {
+        console.log(err);
+        response.send(404);
+      } else {
+        console.log("Profile")
+        console.log(data)
+        let result = {};
+        result["profile"] = data;
+        response.send(200, result.profile);
+      }
+    });
+  });
+
   server.get("/trip/user/:uuid", function(request, response, next){
     if (!request.clientId) return response.sendUnauthenticated();
 
@@ -272,13 +409,22 @@ function init(server){
     lastEvaluatedKey["userId"] = request.params.userId;
     lastEvaluatedKey["creationDate"] = request.params.creationDate;
 
-    getUserTrips(request.params.uuid, lastEvaluatedKey, function(err, data) {
+    let userId = request.params.uuid;
+    if (typeof userId === 'undefined' || userId == null || !userId.trim()) {
+      response.send(422, `userId is not associated`);
+      next();
+      return;
+    }
+
+    getUserTrips(userId, lastEvaluatedKey, function(err, data) {
       console.log("data: " + data);
       if (err) {
         console.log(err);
         response.send(404);
       } else {
-        response.send(200, data);
+        let result = {};
+        result["profile"] = data;
+        response.send(200, result.profile);
       }
     });
   });
@@ -294,7 +440,7 @@ function init(server){
       return;
     }
 
-    let followerId = request.params.followerId;
+    let followerId = request.header("userId", "");
     if (typeof followerId === 'undefined' || followerId == null || !followerId.trim()) {
       response.send(422, `followerId is not associated`);
       next();
@@ -312,7 +458,7 @@ function init(server){
 
   });
 
-  server.post("/unfollow", function(request, response, next) {
+  server.post("/trip/unfollow", function(request, response, next) {
     if (!request.clientId) return response.sendUnauthenticated();
 
     let tripId = request.params.tripId;
@@ -322,7 +468,7 @@ function init(server){
       return;
     }
 
-    let followerId = request.params.followerId;
+    let followerId = request.header("userId", "");
     if (typeof followerId === 'undefined' || followerId == null || !followerId.trim()) {
       response.send(422, `followerId is not associated`);
       next();

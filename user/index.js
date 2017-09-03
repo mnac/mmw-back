@@ -119,18 +119,20 @@ function findUserPromise(uuid) {
   });
 }
 
-function findUserById(uuid, result){
-  db(`select * from users where uuid=?;`, uuid, function(error, rows){
-    if (error) {
-      console.log(error);
-      return result(error, null);
-    } else if (rows.length == 0) {
-      console.log(`User do not exist`);
-      return result("User not find", null);
-    } else {
-      console.log(rows[0]);
-      return result(error, rows[0]);
-    }
+function findUserById(uuid){
+  return new Promise(function(resolve, reject) {
+    db(`select first_name, last_name, gender, birthday, profile_picture from users where uuid=?;`, uuid, function(error, rows){
+      if (error) {
+        console.log(error);
+        reject(error);
+      } else if (rows.length == 0) {
+        console.log(`User do not exist`);
+        reject(new Error("Do not exist"));
+      } else {
+        console.log(rows[0]);
+        resolve(rows[0]);
+      }
+    });
   });
 };
 
@@ -152,9 +154,6 @@ function comparePassword(candidatePassword, encryptedPassword, result) {
 
 function init(server){
   console.log(`initUser---------------------`);
-  server.get("/profile", function(request, response, next){
-
-  });
 
   server.post("/follow", function(request, response, next) {
     if (!request.clientId) return response.sendUnauthenticated();
@@ -242,7 +241,7 @@ function init(server){
   });
 
   server.post("/push", function(request, response, next){
-      let userUuid = request.params.uuid;
+      let userUuid = request.header("userId", "");
       if (typeof userUuid === 'undefined' || userUuid == null || !userUuid.trim()) {
         response.send(422, `No user uuid associated`);
         next();
@@ -340,6 +339,7 @@ function init(server){
 module.exports = {
   init,
   findUserPromise,
+  findUserById,
   findUserByEmail,
   validCredentials,
   saveToken

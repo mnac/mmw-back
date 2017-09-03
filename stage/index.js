@@ -99,7 +99,7 @@ function saveStage(stage, result){
       "id": stage.id,
       "tripId": stage.tripId,
       "title": stage.title,
-      "description": stage.description,
+      "comment": stage.comment,
       "pictureUrl": stage.pictureUrl,
       "latitude": stage.latitude,
       "longitude": stage.longitude,
@@ -154,6 +154,13 @@ function handleStage(from, request, response, next) {
   let pictureUrl = stage.pictureUrl;
   if (typeof pictureUrl === 'undefined' || pictureUrl == null || !pictureUrl.trim()) {
     response.send(409, "Stage must contain a picture");
+    next();
+    return;
+  }
+
+  let rate = stage.rate;
+  if (typeof rate === 'undefined' || rate == null || rate === 0) {
+    response.send(409, "Stage must contain a rating");
     next();
     return;
   }
