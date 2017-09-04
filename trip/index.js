@@ -2,31 +2,68 @@ var dynamo = require('../config/database/index.js').dynamo;
 var uuid = require('uuid');
 var User = require('../user/index.js');
 var stage = require('../stage/index.js');
+var indexing = require('../search/index.js');
 
-function getTripFollower(tripId, userId, exclusiveStartKey) {
-  console.log("Trip follower trip Id: " + tripId);
-  console.log("Trip follower user Id: " + userId);
-
+function saveTrip(trip, result){
   var params = {
-    TableName: 'trip-follower',
+    TableName: 'trip',
+    Item: {
+      "id": trip.id,
+      "userId": trip.userId,
+      "title": trip.title,
+      "description": trip.description,
+      "pictureUrl": trip.pictureUrl,
+      "creationDate": trip.creationDate,
+      "updatedDate": trip.updatedDate,
+      "feed": "timeline"
+    }
+  };
+  dynamo.put(params, result);
+  indexing.saveNewTrip(trip);
+}
+
+function updateTrip(tripId) {
+  trip.getIndexedTrip(tripId, function(err, result){
+      if (result) {
+        console.log("Trip to re index: ");
+        console.log(trip);
+        indexing.updateTrip(result);
+      }
+    });
+}
+
+function getIndexedTrip(tripId, result) {
+  var params = {
+    TableName: 'trip',
     Limit: 1,
     ScanIndexForward: false,
-    KeyConditionExpression: 'tripId = :x AND followerId = :y',
+    KeyConditionExpression: 'id = :x',
     ExpressionAttributeValues: {
-      ':x': tripId,
-      ':y': userId
+      ':x': tripId
     }
   };
 
-  if (exclusiveStartKey != null
-    && typeof exclusiveStartKey.id !== 'undefined'
-    && typeof exclusiveStartKey.tripId !== 'undefined'
-    && typeof exclusiveStartKey.date !== 'undefined') {
-      console.log(exclusiveStartKey);
-      params["ExclusiveStartKey"] = exclusiveStartKey;
-  }
-
-  return dynamo.query(params);
+  dynamo.query(params).promise()
+    .then(function(trip){
+      console.log("trip");
+      console.log(trip);
+      let tripStages = trip.Items[0];
+      return stage.getTripStages(tripStages.id, null).promise()
+        .then(function(stages){
+          tripStages.stages = stages.Items;
+          console.log("stages");
+          console.log(stages);
+          return Promise.resolve(tripStages);
+        });
+    }).then((trip) => {
+      console.log("trip");
+      console.log(trip);
+      return result(null, trip);
+    }).catch(function(err) {
+      console.log("Final Catch");
+      console.log(err);
+      result(err);
+    });
 }
 
 function getTrip(tripId, userId, result) {
@@ -223,21 +260,30 @@ function getTimeLineTrips(exclusiveStartKey, currentUserId, result) {
     });
 }
 
-function saveTrip(trip, result){
+function getTripFollower(tripId, userId, exclusiveStartKey) {
+  console.log("Trip follower trip Id: " + tripId);
+  console.log("Trip follower user Id: " + userId);
+
   var params = {
-    TableName: 'trip',
-    Item: {
-      "id": trip.id,
-      "userId": trip.userId,
-      "title": trip.title,
-      "description": trip.description,
-      "pictureUrl": trip.pictureUrl,
-      "creationDate": trip.creationDate,
-      "updatedDate": trip.updatedDate,
-      "feed": "timeline"
+    TableName: 'trip-follower',
+    Limit: 1,
+    ScanIndexForward: false,
+    KeyConditionExpression: 'tripId = :x AND followerId = :y',
+    ExpressionAttributeValues: {
+      ':x': tripId,
+      ':y': userId
     }
   };
-  dynamo.put(params, result);
+
+  if (exclusiveStartKey != null
+    && typeof exclusiveStartKey.id !== 'undefined'
+    && typeof exclusiveStartKey.tripId !== 'undefined'
+    && typeof exclusiveStartKey.date !== 'undefined') {
+      console.log(exclusiveStartKey);
+      params["ExclusiveStartKey"] = exclusiveStartKey;
+  }
+
+  return dynamo.query(params);
 }
 
 function saveTripFollower(tripId, followerId, result){
@@ -430,6 +476,31 @@ function init(server){
   });
 
 
+  server.post("/search/:query", function(request, response, next) {
+    if (!request.clientId) return response.sendUnauthenticated();
+
+    let query = request.params.query;
+    if (typeof query === 'undefined' || query == null || !query.trim()) {
+      response.send(422, `Query is not correct`);
+      next();
+      return;
+    }
+
+    indexing.searchTrip(query, function(err, result) {
+      if (err) {
+        response.send(500, `Une erreur est survenue sur nos serveurs`);
+      } else {
+        let trips = [];
+        for (let hit of result.hits){
+          trips.push(hit.trip);
+        }
+        response.send(200, {trips: trips});
+        next()
+      }
+    });
+
+  });
+
   server.post("/trip/follow", function(request, response, next) {
     if (!request.clientId) return response.sendUnauthenticated();
 
@@ -490,5 +561,6 @@ function init(server){
 module.exports = {
     init,
     getTrip,
+    getIndexedTrip,
     saveTrip
 };

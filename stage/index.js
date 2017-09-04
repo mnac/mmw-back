@@ -3,6 +3,68 @@ var uuid = require('uuid');
 var user = require('../user/index.js');
 var message = require('../config/notification/index.js');
 var redis = require('../config/database/index.js').redis;
+var indexing = require('../search/index.js');
+
+function saveStage(stage, result){
+  var params = {
+    TableName: 'stage',
+    Item: {
+      "id": stage.id,
+      "tripId": stage.tripId,
+      "title": stage.title,
+      "comment": stage.comment,
+      "pictureUrl": stage.pictureUrl,
+      "latitude": stage.latitude,
+      "longitude": stage.longitude,
+      "address": stage.address,
+      "date": stage.date,
+      "rate": stage.rate,
+      "type": stage.type,
+      "creationDate": stage.creationDate,
+      "updatedDate": stage.updatedDate
+    }
+  };
+  dynamo.put(params, result);
+  getIndexedTrip(stage.tripId, function(err, result) {
+    if (result) {
+      indexing.updateTrip(result);
+    }
+  });
+}
+
+function getIndexedTrip(tripId, result) {
+  var params = {
+    TableName: 'trip',
+    Limit: 1,
+    ScanIndexForward: false,
+    KeyConditionExpression: 'id = :x',
+    ExpressionAttributeValues: {
+      ':x': tripId
+    }
+  };
+
+  dynamo.query(params).promise()
+    .then(function(trip){
+      console.log("trip");
+      console.log(trip);
+      let tripStages = trip.Items[0];
+      return getTripStages(tripStages.id, null).promise()
+        .then(function(stages){
+          tripStages.stages = stages.Items;
+          console.log("stages");
+          console.log(stages);
+          return Promise.resolve(tripStages);
+        });
+    }).then((trip) => {
+      console.log("trip");
+      console.log(trip);
+      return result(null, trip);
+    }).catch(function(err) {
+      console.log("Final Catch");
+      console.log(err);
+      result(err);
+    });
+}
 
 function notifyFollowers(tripId) {
   console.log("Notify for tripId: " + tripId);
@@ -90,28 +152,6 @@ function getTripStages(tripId, exclusiveStartKey) {
   }
 
   return dynamo.query(params);
-}
-
-function saveStage(stage, result){
-  var params = {
-    TableName: 'stage',
-    Item: {
-      "id": stage.id,
-      "tripId": stage.tripId,
-      "title": stage.title,
-      "comment": stage.comment,
-      "pictureUrl": stage.pictureUrl,
-      "latitude": stage.latitude,
-      "longitude": stage.longitude,
-      "address": stage.address,
-      "date": stage.date,
-      "rate": stage.rate,
-      "type": stage.type,
-      "creationDate": stage.creationDate,
-      "updatedDate": stage.updatedDate
-    }
-  };
-  dynamo.put(params, result);
 }
 
 function handleStage(from, request, response, next) {
