@@ -267,6 +267,35 @@ function init(server){
       });
   });
 
+  server.put("/user", function(request, response, next) {
+    if (!request.clientId) return response.sendUnauthenticated();
+    let user = request.params.user;
+
+    console.log("ClientId: ")
+    console.log(request.clientId);
+
+    if (request.clientId !== user.email) {
+      response.send(403, `Vous ne pouvez pas mettre à jour ce profile`);
+      next();
+    }
+
+    let values = [user.firstName, user.lastName, user.pseudo, user.gender, user.birthday, user.pictureProfile, user.description, user.uuid];
+    let sql = `update users set first_name=?, last_name=?, pseudo=?, gender=?, birthday=?, profile_picture=?, description=? where uuid=?;`;
+
+    db(sql, values, function(error, result){
+      if (error) {
+        console.log("update failed");
+        console.log(error);
+        response.send(503, error);
+        next();
+      } else {
+        console.log("User updated");
+        response.send(200);
+        next();
+      }
+    });
+  });
+
   server.post("/user/register", function(request, response, next){
     let email = request.params.email;
     let password = request.params.password;
