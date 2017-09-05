@@ -121,7 +121,7 @@ function findUserPromise(uuid) {
 
 function findUserById(uuid){
   return new Promise(function(resolve, reject) {
-    db(`select first_name, last_name, gender, birthday, profile_picture from users where uuid=?;`, uuid, function(error, rows){
+    db(`select first_name, last_name, pseudo, description, gender, birthday, profile_picture from users where uuid=?;`, uuid, function(error, rows){
       if (error) {
         console.log(error);
         reject(error);
@@ -274,7 +274,7 @@ function init(server){
     console.log("ClientId: ")
     console.log(request.clientId);
 
-    if (request.clientId !== user.email) {
+    if (typeof user === 'undefined' || user == null || request.clientId !== user.email) {
       response.send(403, `Vous ne pouvez pas mettre à jour ce profile`);
       next();
     }
