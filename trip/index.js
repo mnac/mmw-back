@@ -123,13 +123,19 @@ function getTrip(tripId, userId, result) {
     });
 }
 
+function compareTrip(a,b) {
+  if (a.creationDate < b.creationDate) return -1;
+  if (a.creationDate > b.creationDate) return 1;
+  return 0;
+}
+
 function getFavorites(userId, exclusiveStartKey, result) {
   console.log("userId");
   console.log(userId);
   var params = {
     TableName: 'trip-follower',
     Limit: 50,
-    IndexName: 'followerId-index',
+    IndexName: 'followerId-creationDate-index',
     ScanIndexForward: false,
     KeyConditionExpression: 'followerId = :x',
     ExpressionAttributeValues: {
@@ -185,6 +191,8 @@ function getFavorites(userId, exclusiveStartKey, result) {
     }).then(function(trips) {
       console.log("trips");
       console.log(trips);
+
+      trips.sort(compareTrip)
 
       let promises = [];
 
@@ -406,7 +414,8 @@ function saveTripFollower(tripId, followerId, result){
     TableName: 'trip-follower',
     Item: {
       "tripId": tripId,
-      "followerId": followerId
+      "followerId": followerId,
+      "creationDate": new Date().toISOString()
     }
   };
   dynamo.put(params, result);
