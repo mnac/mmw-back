@@ -121,7 +121,7 @@ function findUserPromise(uuid) {
 
 function findUserById(uuid){
   return new Promise(function(resolve, reject) {
-    db(`select first_name, last_name, pseudo, description, gender, birthday, profile_picture from users where uuid=?;`, uuid, function(error, rows){
+    db(`select uuid, email, first_name, last_name, pseudo, description, gender, birthday, profile_picture from users where uuid=?;`, uuid, function(error, rows){
       if (error) {
         console.log(error);
         reject(error);
@@ -276,7 +276,7 @@ function init(server){
 
     if (typeof user === 'undefined' || user == null || request.clientId !== user.email) {
       response.send(403, `Vous ne pouvez pas mettre à jour ce profile`);
-      next();
+      return next();
     }
 
     let values = [user.firstName, user.lastName, user.pseudo, user.gender, user.birthday, user.pictureProfile, user.description, user.uuid];
@@ -331,9 +331,9 @@ function init(server){
           console.log("user do not exist can be created.");
           let bCryptPassword = cryptPassword(password);
           console.log("bCryptPassword: " + bCryptPassword);
-          let firstName = (typeof request.params.first_name === 'undefined') ? null : request.params.first_name;
+          let firstName = (typeof request.params.firstName === 'undefined') ? null : request.params.firstName;
           console.log("firstName: " + firstName);
-          let lastName = (typeof request.params.last_name === 'undefined') ? null : request.params.last_name;
+          let lastName = (typeof request.params.lastName === 'undefined') ? null : request.params.lastName;
           console.log("lastName: " + lastName);
           let pseudo = (typeof request.params.pseudo === 'undefined') ? null : request.params.pseudo;
           console.log("pseudo: " + pseudo);

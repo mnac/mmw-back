@@ -19,7 +19,15 @@ function saveTrip(trip, result){
     }
   };
   dynamo.put(params, result);
-  indexing.saveNewTrip(trip);
+
+  User.findUserPromise(trip.userId)
+    .then(function(user){
+      trip.user = user;
+      indexing.saveNewTrip(trip);
+    }).catch(function(userError){
+      trip.user = {};
+      indexing.saveNewTrip(trip);
+    });
 }
 
 function updateTrip(tripId) {
@@ -109,6 +117,113 @@ function getTrip(tripId, userId, result) {
       console.log(trip);
       return result(null, trip);
     }).catch(function(err) {
+      console.log("Final Catch");
+      console.log(err);
+      result(err);
+    });
+}
+
+function getFavorites(userId, exclusiveStartKey, result) {
+  console.log("userId");
+  console.log(userId);
+  var params = {
+    TableName: 'trip-follower',
+    Limit: 50,
+    IndexName: 'followerId-index',
+    ScanIndexForward: false,
+    KeyConditionExpression: 'followerId = :x',
+    ExpressionAttributeValues: {
+      ':x': userId
+    }
+  };
+
+  dynamo.query(params).promise()
+    .then(function(tripsFollower){
+      console.log("follower: ");
+      console.log(tripsFollower.Items);
+      let promises = [];
+      let trips = [];
+
+      for (let tripFollower of tripsFollower.Items) {
+
+        console.log("tripFollower: ");
+        console.log(tripFollower);
+
+        (function(tripFollower){
+          var tripParams = {
+            TableName: 'trip',
+            Limit: 1,
+            ScanIndexForward: false,
+            KeyConditionExpression: 'id = :x',
+            ExpressionAttributeValues: {
+              ':x': tripFollower.tripId
+            }
+          };
+
+          promises.push(dynamo.query(tripParams).promise()
+            .then(function(trip){
+
+              console.log("trip");
+              console.log(trip);
+
+              console.log("trip Id");
+              console.log(trip.Items[0].id);
+
+              trips.push(trip.Items[0]);
+
+              return Promise.resolve();
+          }));
+        })(tripFollower);
+      }
+
+      return Promise.all(promises).then(() => {
+        console.log("tripsFollower");
+        console.log(tripsFollower);
+        return Promise.resolve(trips);
+      });
+
+    }).then(function(trips) {
+      console.log("trips");
+      console.log(trips);
+
+      let promises = [];
+
+      for (let trip of trips) {
+        (function(trip){
+          promises.push(stage.getTripStages(trip.id, null).promise()
+            .then(function(stages){
+              console.log("stages");
+              console.log(stages);
+              trip.stages = stages.Items;
+
+              console.log("trip");
+              console.log(trip);
+            }));
+
+          promises.push(User.findUserPromise(trip.userId)
+            .then(function(user){
+              trip.user = user;
+              console.log("user");
+              console.log(user);
+            }).catch(function(userError){
+              trip.user = {};
+              console.log(userError);
+            }));
+
+        })(trip);
+      }
+
+      return Promise.all(promises).then(() => {
+        return Promise.resolve(trips);
+      });
+
+    })
+    .then(function(tripsStaged){
+      let trips = {}
+      trips["trips"] = tripsStaged;
+      return result(null, trips);
+    })
+    .catch(function(err) {
       console.log("Final Catch");
       console.log(err);
       result(err);
@@ -413,6 +528,31 @@ function init(server){
         let trips = {};
         trips["trips"] = data;
         response.send(200, trips);
+      }
+    });
+  });
+
+  server.get("/favorites", function(request, response, next){
+    if (!request.clientId) return response.sendUnauthenticated();
+
+    let lastEvaluatedKey = {};
+
+    let userId = request.header("userId", "");
+    if (typeof userId === 'undefined' || userId == null || !userId.trim()) {
+      response.send(422, `userId is not associated`);
+      next();
+      return;
+    }
+
+    getFavorites(userId, lastEvaluatedKey, function(err, data) {
+      console.log("data: " + data);
+      if (err) {
+        console.log(err);
+        response.send(404);
+      } else {
+        console.log("Profile")
+        console.log(data)
+        response.send(200, data);
       }
     });
   });
